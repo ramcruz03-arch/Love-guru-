@@ -1,0 +1,22 @@
+name: Unpack project
+on:
+  push:
+    paths: ['.github/workflows/unpack.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          unzip -q love_guru.zip -d /tmp/u
+          rm -rf /tmp/u/love_guru/.git /tmp/u/love_guru/.github/workflows
+          cp -a /tmp/u/love_guru/. .
+          git rm -q love_guru.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: initial Love Guru Flutter MVP"
+          git push
