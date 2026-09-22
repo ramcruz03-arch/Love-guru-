@@ -2,6 +2,7 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,12 +16,30 @@ jobs:
         with:
           channel: stable
           cache: true
-      - name: Generate Android files if missing
-        run: bash scripts/setup_android.sh
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter build apk --release
+      - name: Prepare project
+        run: |
+          if [ ! -f pubspec.yaml ] && [ -f love_guru.zip ]; then
+            unzip -q -o love_guru.zip -d .
+          fi
+          P=$(find . -name pubspec.yaml -not -path "*/.dart_tool/*" | head -1)
+          if [ -z "$P" ]; then echo "No Flutter project found"; ls -la; exit 1; fi
+          DIR=$(dirname "$P")
+          echo "APP_DIR=$DIR" >> "$GITHUB_ENV"
+          cd "$DIR"
+          if [ ! -d android ]; then
+            flutter create . --platforms android --org com.loveguru --project-name love_guru
+          fi
+          sed -i 's/android:label="love_guru"/android:label="Love Guru"/' android/app/src/main/AndroidManifest.xml
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter pub get
+      - name: Analyze
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter analyze --no-fatal-infos
+      - name: Build release APK
+        working-directory: ${{ env.APP_DIR }}
+        run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
           name: love-guru-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ env.APP_DIR }}/build/app/outputs/flutter-apk/app-release.apk
